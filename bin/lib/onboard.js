@@ -117,7 +117,7 @@ const REMOTE_PROVIDER_CONFIG = {
     label: "Amazon Bedrock (OpenAI-compatible endpoint)",
     providerName: "bedrock",
     providerType: "openai",
-    credentialEnv: "OPENAI_API_KEY",
+    credentialEnv: "BEDROCK_API_KEY",
     endpointUrl: BEDROCK_ENDPOINT_URL,
     helpUrl: "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-generate.html",
     modelMode: "curated",
@@ -1784,6 +1784,7 @@ async function setupNim(gpu) {
               }
               continue selectionLoop;
             }
+            // Bedrock Mantle exposes an OpenAI-compatible API
             const retryMessage = "Please choose a provider/model again.";
             preferredInferenceApi = await validateOpenAiLikeSelection(
               remoteConfig.label,
