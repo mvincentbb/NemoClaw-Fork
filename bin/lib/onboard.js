@@ -47,7 +47,7 @@ const BUILD_ENDPOINT_URL = "https://integrate.api.nvidia.com/v1";
 const OPENAI_ENDPOINT_URL = "https://api.openai.com/v1";
 const ANTHROPIC_ENDPOINT_URL = "https://api.anthropic.com";
 const GEMINI_ENDPOINT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
-const BEDROCK_ENDPOINT_URL = `https://bedrock-mantle.${process.env.BEDROCK_REGION || process.env.AWS_REGION || "us-west-2"}.api.aws/v1`;
+const BEDROCK_ENDPOINT_URL = `https://bedrock-mantle.${process.env.BEDROCK_REGION || process.env.AWS_REGION || ""}.api.aws/v1`;
 
 const REMOTE_PROVIDER_CONFIG = {
   build: {
@@ -1639,7 +1639,6 @@ async function setupNim(gpu) {
   options.push({ key: "anthropic", label: "Anthropic" });
   options.push({ key: "anthropicCompatible", label: "Other Anthropic-compatible endpoint" });
   options.push({ key: "gemini", label: "Google Gemini" });
-  options.push({ key: "bedrock", label: "Amazon Bedrock (OpenAI-compatible endpoint)" });
   if (hasOllama || ollamaRunning) {
     options.push({
       key: "ollama",
@@ -1648,6 +1647,7 @@ async function setupNim(gpu) {
         (ollamaRunning ? " (suggested)" : ""),
     });
   }
+  options.push({ key: "bedrock", label: "Amazon Bedrock (OpenAI-compatible endpoint)" });
   if (EXPERIMENTAL && gpu && gpu.nimCapable) {
     options.push({ key: "nim-local", label: "Local NVIDIA NIM [experimental]" });
   }
@@ -1745,7 +1745,7 @@ async function setupNim(gpu) {
         }
         const defaultModel = requestedModel || remoteConfig.defaultModel;
         let modelValidator = null;
-        if (selected.key === "openai" || selected.key === "gemini") {
+        if (selected.key === "openai" || selected.key === "gemini" || selected.key === "bedrock") {
           modelValidator = (candidate) =>
             validateOpenAiLikeModel(remoteConfig.label, endpointUrl, candidate, getCredential(credentialEnv));
         } else if (selected.key === "anthropic") {
@@ -1776,11 +1776,26 @@ async function setupNim(gpu) {
               continue selectionLoop;
             }
           } else if (selected.key === "bedrock") {
-            // Skip endpoint validation for Bedrock — the API key format
-            // (service-specific credential) is not compatible with standard
-            // OpenAI probe requests. Validation happens at inference time.
-            preferredInferenceApi = "openai-completions";
-            break;
+            // Bedrock API keys are region-bound — require an explicit region.
+            if (!process.env.BEDROCK_REGION && !process.env.AWS_REGION) {
+              console.error("  BEDROCK_REGION or AWS_REGION must be set for Amazon Bedrock.");
+              if (isNonInteractive()) {
+                process.exit(1);
+              }
+              continue selectionLoop;
+            }
+            const retryMessage = "Please choose a provider/model again.";
+            preferredInferenceApi = await validateOpenAiLikeSelection(
+              remoteConfig.label,
+              endpointUrl,
+              model,
+              credentialEnv,
+              retryMessage
+            );
+            if (preferredInferenceApi) {
+              break;
+            }
+            continue selectionLoop;
           } else if (selected.key === "anthropicCompatible") {
             const validation = await validateCustomAnthropicSelection(
               remoteConfig.label,
