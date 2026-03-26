@@ -47,6 +47,7 @@ const BUILD_ENDPOINT_URL = "https://integrate.api.nvidia.com/v1";
 const OPENAI_ENDPOINT_URL = "https://api.openai.com/v1";
 const ANTHROPIC_ENDPOINT_URL = "https://api.anthropic.com";
 const GEMINI_ENDPOINT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
+const BEDROCK_ENDPOINT_URL = `https://bedrock-mantle.${process.env.BEDROCK_REGION || process.env.AWS_REGION || "us-west-2"}.api.aws/v1`;
 
 const REMOTE_PROVIDER_CONFIG = {
   build: {
@@ -112,6 +113,17 @@ const REMOTE_PROVIDER_CONFIG = {
     defaultModel: "",
     skipVerify: true,
   },
+  bedrock: {
+    label: "Amazon Bedrock (OpenAI-compatible endpoint)",
+    providerName: "bedrock",
+    providerType: "openai",
+    credentialEnv: "OPENAI_API_KEY",
+    endpointUrl: BEDROCK_ENDPOINT_URL,
+    helpUrl: "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-generate.html",
+    modelMode: "curated",
+    defaultModel: "nvidia.nemotron-super-3-120b",
+    skipVerify: true,
+  },
 };
 
 const REMOTE_MODEL_OPTIONS = {
@@ -133,6 +145,15 @@ const REMOTE_MODEL_OPTIONS = {
     "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
+  ],
+  bedrock: [
+    "nvidia.nemotron-nano-3-30b",
+    "nvidia.nemotron-super-3-120b",
+    "deepseek.v3.2",
+    "openai.gpt-oss-120b",
+    "mistral.devstral-2-123b",
+    "moonshotai.kimi-k2.5",
+    "minimax.minimax-m2.5",
   ],
 };
 
@@ -1193,10 +1214,10 @@ function getNonInteractiveProvider() {
     anthropiccompatible: "anthropicCompatible",
   };
   const normalized = aliases[providerKey] || providerKey;
-  const validProviders = new Set(["build", "openai", "anthropic", "anthropicCompatible", "gemini", "ollama", "custom", "nim-local", "vllm"]);
+  const validProviders = new Set(["build", "openai", "anthropic", "anthropicCompatible", "gemini", "ollama", "custom", "nim-local", "vllm", "bedrock"]);
   if (!validProviders.has(normalized)) {
     console.error(`  Unsupported NEMOCLAW_PROVIDER: ${providerKey}`);
-    console.error("  Valid values: build, openai, anthropic, anthropicCompatible, gemini, ollama, custom, nim-local, vllm");
+    console.error("  Valid values: build, openai, anthropic, anthropicCompatible, gemini, ollama, custom, nim-local, vllm, bedrock");
     process.exit(1);
   }
 
@@ -1618,6 +1639,7 @@ async function setupNim(gpu) {
   options.push({ key: "anthropic", label: "Anthropic" });
   options.push({ key: "anthropicCompatible", label: "Other Anthropic-compatible endpoint" });
   options.push({ key: "gemini", label: "Google Gemini" });
+  options.push({ key: "bedrock", label: "Amazon Bedrock (OpenAI-compatible endpoint)" });
   if (hasOllama || ollamaRunning) {
     options.push({
       key: "ollama",
@@ -1753,6 +1775,12 @@ async function setupNim(gpu) {
             if (validation.retry === "selection") {
               continue selectionLoop;
             }
+          } else if (selected.key === "bedrock") {
+            // Skip endpoint validation for Bedrock — the API key format
+            // (service-specific credential) is not compatible with standard
+            // OpenAI probe requests. Validation happens at inference time.
+            preferredInferenceApi = "openai-completions";
+            break;
           } else if (selected.key === "anthropicCompatible") {
             const validation = await validateCustomAnthropicSelection(
               remoteConfig.label,
@@ -1994,7 +2022,7 @@ async function setupInference(sandboxName, model, provider, endpointUrl = null, 
   step(4, 7, "Setting up inference provider");
   runOpenshell(["gateway", "select", GATEWAY_NAME], { ignoreError: true });
 
-  if (provider === "nvidia-prod" || provider === "nvidia-nim" || provider === "openai-api" || provider === "anthropic-prod" || provider === "compatible-anthropic-endpoint" || provider === "gemini-api" || provider === "compatible-endpoint") {
+  if (provider === "nvidia-prod" || provider === "nvidia-nim" || provider === "openai-api" || provider === "anthropic-prod" || provider === "compatible-anthropic-endpoint" || provider === "gemini-api" || provider === "compatible-endpoint" || provider === "bedrock") {
     const config = provider === "nvidia-nim"
       ? REMOTE_PROVIDER_CONFIG.build
       : Object.values(REMOTE_PROVIDER_CONFIG).find((entry) => entry.providerName === provider);
