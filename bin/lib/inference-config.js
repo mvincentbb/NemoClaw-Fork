@@ -114,7 +114,7 @@ function getProviderSelectionConfig(provider, model) {
         ncpPartner: null,
         model: model || "nvidia.nemotron-super-3-120b",
         profile: DEFAULT_ROUTE_PROFILE,
-        credentialEnv: "OPENAI_API_KEY",
+        credentialEnv: "BEDROCK_API_KEY",
         provider,
         providerLabel: "Amazon Bedrock (OpenAI-compatible)",
       };

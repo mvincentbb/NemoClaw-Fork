@@ -499,6 +499,7 @@ function getSandboxInferenceConfig(model, provider = null, preferredInferenceApi
         supportsStore: false,
       };
       break;
+    case "bedrock":
     case "compatible-endpoint":
       providerKey = "inference";
       primaryModelRef = `inference/${model}`;
@@ -2326,6 +2327,7 @@ function printDashboard(sandboxName, model, provider, nimContainer = null) {
   else if (provider === "gemini-api") providerLabel = "Google Gemini";
   else if (provider === "compatible-endpoint") providerLabel = "Other OpenAI-compatible endpoint";
   else if (provider === "vllm-local") providerLabel = "Local vLLM";
+  else if (provider === "bedrock") providerLabel = "Amazon Bedrock";
   else if (provider === "ollama-local") providerLabel = "Local Ollama";
 
   const token = fetchGatewayAuthTokenFromSandbox(sandboxName);
