@@ -1707,6 +1707,18 @@ async function setupNim(gpu) {
       endpointUrl = remoteConfig.endpointUrl;
       preferredInferenceApi = null;
 
+      if (selected.key === "bedrock") {
+        const bedrockRegion = process.env.BEDROCK_REGION || process.env.AWS_REGION;
+        if (!bedrockRegion) {
+          console.error("  BEDROCK_REGION or AWS_REGION must be set for Amazon Bedrock.");
+          if (isNonInteractive()) {
+            process.exit(1);
+          }
+          continue selectionLoop;
+        }
+        endpointUrl = `https://bedrock-mantle.${bedrockRegion}.api.aws/v1`;
+      }
+
       if (selected.key === "custom") {
         endpointUrl = isNonInteractive()
           ? (process.env.NEMOCLAW_ENDPOINT_URL || "").trim()
@@ -1777,14 +1789,6 @@ async function setupNim(gpu) {
               continue selectionLoop;
             }
           } else if (selected.key === "bedrock") {
-            // Bedrock API keys are region-bound — require an explicit region.
-            if (!process.env.BEDROCK_REGION && !process.env.AWS_REGION) {
-              console.error("  BEDROCK_REGION or AWS_REGION must be set for Amazon Bedrock.");
-              if (isNonInteractive()) {
-                process.exit(1);
-              }
-              continue selectionLoop;
-            }
             // Bedrock Mantle exposes an OpenAI-compatible API
             const retryMessage = "Please choose a provider/model again.";
             preferredInferenceApi = await validateOpenAiLikeSelection(
