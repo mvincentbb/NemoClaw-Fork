@@ -1965,7 +1965,6 @@ async function setupNim(gpu) {
         (ollamaRunning ? " (suggested)" : ""),
     });
   }
-  options.push({ key: "bedrock", label: "Amazon Bedrock (OpenAI-compatible endpoint)" });
   if (EXPERIMENTAL && gpu && gpu.nimCapable) {
     options.push({ key: "nim-local", label: "Local NVIDIA NIM [experimental]" });
   }
@@ -1975,7 +1974,7 @@ async function setupNim(gpu) {
       label: "Local vLLM [experimental] — running",
     });
   }
-
+  options.push({ key: "bedrock", label: "Amazon Bedrock (OpenAI-compatible endpoint)" });
   // On macOS without Ollama, offer to install it
   if (!hasOllama && process.platform === "darwin") {
     options.push({ key: "install-ollama", label: "Install Ollama (macOS)" });
