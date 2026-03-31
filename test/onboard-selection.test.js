@@ -2371,4 +2371,96 @@ const { setupNim } = require(${onboardPath});
     assert.equal(payload.result.preferredInferenceApi, "openai-completions");
     assert.ok(payload.lines.some((line) => line.includes("tool-call-parser requires")));
   });
+
+  it("shows curated Bedrock models and validates selection with region check", () => {
+    const repoRoot = path.join(import.meta.dirname, "..");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-onboard-bedrock-selection-"));
+    const fakeBin = path.join(tmpDir, "bin");
+    const scriptPath = path.join(tmpDir, "bedrock-selection-check.js");
+    const onboardPath = JSON.stringify(path.join(repoRoot, "bin", "lib", "onboard.js"));
+    const credentialsPath = JSON.stringify(path.join(repoRoot, "bin", "lib", "credentials.js"));
+    const runnerPath = JSON.stringify(path.join(repoRoot, "bin", "lib", "runner.js"));
+
+    fs.mkdirSync(fakeBin, { recursive: true });
+    fs.writeFileSync(
+      path.join(fakeBin, "curl"),
+      `#!/usr/bin/env bash
+body=""
+status="404"
+outfile=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) outfile="$2"; shift 2 ;;
+    -d) body="$2"; shift 2 ;;
+    *)
+      url="$1"
+      shift
+      ;;
+  esac
+done
+if echo "$url" | grep -q '/chat/completions$'; then
+  status="200"
+  body='{"choices":[{"message":{"content":"OK"}}]}'
+fi
+printf '%s' "$body" > "$outfile"
+printf '%s' "$status"
+`,
+      { mode: 0o755 },
+    );
+
+    // bedrock is option 7 (build, openai, custom, anthropic, anthropicCompatible, gemini, bedrock)
+    // Pick option 7 (bedrock), then model 2 (nvidia.nemotron-super-3-120b)
+    const script = String.raw`
+const credentials = require(${credentialsPath});
+const runner = require(${runnerPath});
+
+const answers = ["7", "2"];
+const messages = [];
+
+credentials.prompt = async (message) => {
+  messages.push(message);
+  return answers.shift() || "";
+};
+runner.runCapture = () => "";
+
+const { setupNim } = require(${onboardPath});
+
+(async () => {
+  process.env.BEDROCK_API_KEY = "bedrock-test-key";
+  process.env.BEDROCK_REGION = "us-west-2";
+  const originalLog = console.log;
+  const lines = [];
+  console.log = (...args) => lines.push(args.join(" "));
+  try {
+    const result = await setupNim(null);
+    originalLog(JSON.stringify({ result, messages, lines }));
+  } finally {
+    console.log = originalLog;
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+`;
+    fs.writeFileSync(scriptPath, script);
+
+    const result = spawnSync(process.execPath, [scriptPath], {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        HOME: tmpDir,
+        PATH: `${fakeBin}:${process.env.PATH || ""}`,
+      },
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout.trim());
+    assert.equal(payload.result.provider, "bedrock");
+    assert.equal(payload.result.model, "nvidia.nemotron-super-3-120b");
+    assert.equal(payload.result.preferredInferenceApi.api, "openai-completions");
+    assert.ok(payload.lines.some((line) => line.includes("Amazon Bedrock")));
+    assert.ok(payload.lines.some((line) => line.includes("nvidia.nemotron-super-3-120b")));
+    assert.ok(payload.lines.some((line) => line.includes("Chat Completions API available")));
+  });
 });
