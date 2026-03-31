@@ -232,18 +232,15 @@ describe("onboard helpers", () => {
   });
 
   it("maps Bedrock to the routed inference provider with supportsStore disabled", () => {
-    assert.deepEqual(
-      getSandboxInferenceConfig("nvidia.nemotron-super-3-120b", "bedrock"),
-      {
-        providerKey: "inference",
-        primaryModelRef: "inference/nvidia.nemotron-super-3-120b",
-        inferenceBaseUrl: "https://inference.local/v1",
-        inferenceApi: "openai-completions",
-        inferenceCompat: {
-          supportsStore: false,
-        },
-      }
-    );
+    assert.deepEqual(getSandboxInferenceConfig("nvidia.nemotron-super-3-120b", "bedrock"), {
+      providerKey: "inference",
+      primaryModelRef: "inference/nvidia.nemotron-super-3-120b",
+      inferenceBaseUrl: "https://inference.local/v1",
+      inferenceApi: "openai-completions",
+      inferenceCompat: {
+        supportsStore: false,
+      },
+    });
   });
 
   it("uses a probed Responses API override when one is available", () => {
